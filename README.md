@@ -1,7 +1,7 @@
 # Integrantes: 
 ### 1- Andre Contreras
 ### 2- ____   _______
-### 3- ____   _______
+### 3- Anel Rojas
 ### 4- ____   _______
 
 # B Tree
