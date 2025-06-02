@@ -1,6 +1,6 @@
 # Integrantes: 
 ### 1- Andre Contreras
-### 2- ____   _______
+### 2- Matias Sanchez
 ### 3- Anel Rojas
 ### 4- ____   _______
 
