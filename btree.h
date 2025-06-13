@@ -5,27 +5,8 @@
 #include "node.h"
 #include <cmath>
 #include <stack>
-using namespace std;
 
-void siguiente_nodo(vector<int>& indices,int M){
-    int i=indices.size()-1;
-    indices[i]++;
-    while(i>=0 && indices[i]==M){
-        indices[i]=0;
-        if(i==0) {
-            indices.insert(indices.begin(), 1);
-            return;
-        }
-        i--;
-        if (i >= 0) indices[i]++;
-    }
-}
-void print(vector<int> &a){
-    for(auto& n:a){
-        cout<<n;
-    }
-    cout<<endl;
-}
+using namespace std;
 
 template <typename T>
 class BTree {
@@ -35,9 +16,9 @@ public:
     int n;
 
 public:
-    explicit BTree(int M) : root(nullptr), M(M),n(0) {}
+    explicit BTree(int M) : root(nullptr), M(M), n(0) {}
 
-    bool search(T key){
+    bool search(T key) {
         Node<T>* node = root;
         while (node != nullptr) {
             int i = 0;
@@ -58,18 +39,81 @@ public:
             n++;
             return;
         }
-
-        if (root->count == M - 1) {
+        if (root->count == M) {
             Node<T>* newRoot = new Node<T>(M);
             newRoot->leaf = false;
             newRoot->children[0] = root;
-
-            splitChild(newRoot, 0, root);
+            ExtractionResult* splitResult = splitChild(newRoot, 0, root);
             root = newRoot;
+            insertNonFull(root, key);
+        } else {
+            insertNonFull(root, key);
+        }
+    }
+
+    void insertNonFull(Node<T>* node, T key) {
+        int i = node->count - 1;
+
+        if (node->leaf) {
+            while (i >= 0 && key < node->keys[i]) {
+                node->keys[i + 1] = node->keys[i];
+                i--;
+            }
+            node->keys[i + 1] = key;
+            node->count++;
+
+            if (node->count == M) {
+                ExtractionResult* splitResult = splitChild(node->parent, i, node);
+            }
+        } else {
+            while (i >= 0 && key < node->keys[i]) {
+                i--;
+            }
+            i++;
+
+            if (node->children[i]->count == M) {
+                ExtractionResult* splitResult = splitChild(node, i, node->children[i]);
+                if (key > node->keys[i]) {
+                    i++;
+                }
+            }
+
+            insertNonFull(node->children[i], key);
+        }
+    }
+
+    ExtractionResult* splitChild(Node<T>* parent, int i, Node<T>* fullChild) {
+
+        Node<T>* newChild = new Node<T>(M);
+        newChild->leaf = fullChild->leaf;
+
+        int m = (M - 1) / 2;
+        T middle = fullChild->keys[m];
+
+        for (int j = 0; j < M - 1 - m; ++j) {
+            newChild->keys[j] = fullChild->keys[m + 1 + j];
+        }
+        if (!fullChild->leaf) {
+            for (int j = 0; j < M - m; ++j) {
+                newChild->children[j] = fullChild->children[m + 1 + j];
+            }
         }
 
-        insertNonFull(root, key);
-        n++;
+        newChild->count = M - 1 - m;
+        fullChild->count = m;
+
+        for (int j = parent->count; j >= i + 1; --j) {
+            parent->children[j + 1] = parent->children[j];
+        }
+        parent->children[i + 1] = newChild;
+
+        for (int j = parent->count - 1; j >= i; --j) {
+            parent->keys[j + 1] = parent->keys[j];
+        }
+        parent->keys[i] = middle;
+        parent->count++;
+
+        return new ExtractionResult(middle, nullptr, newChild);
     }
 
     void remove(T key) {
@@ -82,9 +126,8 @@ public:
         n--;
     }
 
-    int height(){
-        int height=(log(n)/log(M));
-
+    int height() {
+        int height = (log(n) / log(M));
         return height;
     }
 
@@ -104,30 +147,29 @@ public:
         return result;
     }
 
-    T minKey(){
-        Node<T>* node=root;
-        while(!node->leaf){
-            node=node->children[0];
+    T minKey() {
+        Node<T>* node = root;
+        while (!node->leaf) {
+            node = node->children[0];
         }
         return node->keys[0];
     }
 
-    T maxKey() { // profe no se porque pero esto solo funcionaba asi y no se como arreglarlo,
-        // se que es ineficiente pero por alguna razon la forma normal fallaba
+    T maxKey() {
         string s = toString(",");
         size_t last = s.find_last_of(',');
         return stoi(s.substr(last + 1));
     }
 
-
-
-    void clear(){
+    void clear() {
         root->killSelf();
         root = nullptr;
         n = 0;
     }
 
-    int size(){return n; }
+    int size() {
+        return n;
+    }
 
     static BTree* build_from_ordered_vector(vector<T> elements, int M) {
         int n = elements.size();
@@ -170,23 +212,23 @@ public:
         return tree;
     }
 
-    bool check_properties(){
-        return check(root,true);
+    bool check_properties() {
+        return check(root, true);
     }
 
-    ~BTree(){
-        if(root) root->killSelf();
+    ~BTree() {
+        if (root) root->killSelf();
     }
 
 private:
 
-    void toString(Node<T>* nodo, string &result, string sep){
-        int i=0;
-        for (; i < nodo->count; i++)  {
-            if (!nodo->leaf) toString(nodo->children[i], result, sep);
-            result += std::to_string(nodo->keys[i]) + sep;
+    void toString(Node<T>* node, string &result, string sep) {
+        int i = 0;
+        for (; i < node->count; i++)  {
+            if (!node->leaf) toString(node->children[i], result, sep);
+            result += std::to_string(node->keys[i]) + sep;
         }
-        if (!nodo->leaf) toString(nodo->children[i], result, sep);
+        if (!node->leaf) toString(node->children[i], result, sep);
     }
 
     bool check(Node<T>* node, bool root = true) {
@@ -233,183 +275,6 @@ private:
         return true;
     }
 
-    void splitChild(Node<T>* parent, int i, Node<T>* fullChild) {
-        Node<T>* newChild = new Node<T>(M);
-        newChild->leaf = fullChild->leaf;
-
-        int t = (M - 1) / 2;
-
-
-        for (int j = 0; j < M - 1 - t - 1; ++j)
-            newChild->keys[j] = fullChild->keys[j + t + 1];
-
-        if (!fullChild->leaf) {
-            for (int j = 0; j < M - t; ++j)
-                newChild->children[j] = fullChild->children[j + t + 1];
-        }
-
-        newChild->count = M - 1 - t - 1;
-
-        T middleKey = fullChild->keys[t];
-
-        fullChild->count = t;
-
-        for (int j = parent->count; j >= i + 1; --j)
-            parent->children[j + 1] = parent->children[j];
-
-        parent->children[i + 1] = newChild;
-
-        for (int j = parent->count - 1; j >= i; --j)
-            parent->keys[j + 1] = parent->keys[j];
-
-        parent->keys[i] = middleKey;
-        parent->count++;
-    }
-
-
-
-    void insertNonFull(Node<T>* node, T key) {
-        int i = node->count - 1;
-
-        if (node->leaf) {
-            while (i >= 0 && key < node->keys[i]) {
-                node->keys[i + 1] = node->keys[i];
-                i--;
-            }
-            node->keys[i + 1] = key;
-            node->count++;
-        } else {
-            while (i >= 0 && key < node->keys[i]) i--;
-            i++;
-
-            if (node->children[i]->count == M - 1) {
-                splitChild(node, i, node->children[i]);
-                if (key > node->keys[i])
-                    i++;
-            }
-
-            insertNonFull(node->children[i], key);
-        }
-    }
-
-    void removeInternal(Node<T>* node, T key) {
-        int idx = 0;
-        while (idx < node->count && key > node->keys[idx]) idx++;
-
-        if (idx < node->count && node->keys[idx] == key) {
-            if (node->leaf) {
-                for (int i = idx; i < node->count - 1; ++i)
-                    node->keys[i] = node->keys[i + 1];
-                node->count--;
-            } else {
-                Node<T>* pred = node->children[idx];
-                if (pred->count >= (M + 1) / 2) {
-                    while (!pred->leaf)
-                        pred = pred->children[pred->count];
-                    node->keys[idx] = pred->keys[pred->count - 1];
-                    removeInternal(node->children[idx], node->keys[idx]);
-                } else {
-                    Node<T>* succ = node->children[idx + 1];
-                    if (succ->count >= (M + 1) / 2) {
-                        while (!succ->leaf)
-                            succ = succ->children[0];
-                        node->keys[idx] = succ->keys[0];
-                        removeInternal(node->children[idx + 1], node->keys[idx]);
-                    } else {
-                        merge(node, idx);
-                        removeInternal(node->children[idx], key);
-                    }
-                }
-            }
-        } else {
-            if (node->leaf) return;
-            bool flag = (idx == node->count);
-            if (node->children[idx]->count < (M + 1) / 2) {
-                if (idx != 0 && node->children[idx - 1]->count >= (M + 1) / 2)
-                    borrowFromPrev(node, idx);
-                else if (idx != node->count && node->children[idx + 1]->count >= (M + 1) / 2)
-                    borrowFromNext(node, idx);
-                else {
-                    if (idx != node->count)
-                        merge(node, idx);
-                    else
-                        merge(node, idx - 1);
-                }
-            }
-            if (flag && idx > node->count)
-                removeInternal(node->children[idx - 1], key);
-            else
-                removeInternal(node->children[idx], key);
-        }
-    }
-
-    void merge(Node<T>* node, int idx) {
-        Node<T>* child = node->children[idx];
-        Node<T>* sibling = node->children[idx + 1];
-
-        child->keys[(M - 1) / 2] = node->keys[idx];
-
-        for (int i = 0; i < sibling->count; ++i)
-            child->keys[i + (M - 1) / 2 + 1] = sibling->keys[i];
-
-        if (!child->leaf) {
-            for (int i = 0; i <= sibling->count; ++i)
-                child->children[i + (M - 1) / 2 + 1] = sibling->children[i];
-        }
-
-        for (int i = idx + 1; i < node->count; ++i)
-            node->keys[i - 1] = node->keys[i];
-        for (int i = idx + 2; i <= node->count; ++i)
-            node->children[i - 1] = node->children[i];
-
-        child->count += sibling->count + 1;
-        node->count--;
-
-        delete sibling;
-    }
-
-    void borrowFromPrev(Node<T>* node, int idx) {
-        Node<T>* child = node->children[idx];
-        Node<T>* sibling = node->children[idx - 1];
-
-        for (int i = child->count - 1; i >= 0; --i)
-            child->keys[i + 1] = child->keys[i];
-
-        if (!child->leaf) {
-            for (int i = child->count; i >= 0; --i)
-                child->children[i + 1] = child->children[i];
-        }
-
-        child->keys[0] = node->keys[idx - 1];
-        if (!child->leaf)
-            child->children[0] = sibling->children[sibling->count];
-
-        node->keys[idx - 1] = sibling->keys[sibling->count - 1];
-        child->count++;
-        sibling->count--;
-    }
-
-    void borrowFromNext(Node<T>* node, int idx) {
-        Node<T>* child = node->children[idx];
-        Node<T>* sibling = node->children[idx + 1];
-
-        child->keys[child->count] = node->keys[idx];
-
-        if (!child->leaf)
-            child->children[child->count + 1] = sibling->children[0];
-
-        node->keys[idx] = sibling->keys[0];
-
-        for (int i = 1; i < sibling->count; ++i)
-            sibling->keys[i - 1] = sibling->keys[i];
-        if (!sibling->leaf) {
-            for (int i = 1; i <= sibling->count; ++i)
-                sibling->children[i - 1] = sibling->children[i];
-        }
-
-        child->count++;
-        sibling->count--;
-    }
     void range_search_helper(Node<T>* node, T begin, T end, vector<T>& result) {
         if (!node) return;
 
@@ -430,7 +295,6 @@ private:
         if (!node->leaf)
             range_search_helper(node->children[i], begin, end, result);
     }
-
 
 };
 
